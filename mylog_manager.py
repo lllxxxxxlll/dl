@@ -51,7 +51,7 @@ class LogManager:
                             entry['content'],
                             entry['weather'],
                             entry['growth'],
-                            entry[entry.get('image',None)],
+                            entry.get('image',None),
                             datetime.fromisoformat(entry['date'])
                         )
                         self.logs.append(log_entry)

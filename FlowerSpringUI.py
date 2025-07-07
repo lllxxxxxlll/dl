@@ -13,7 +13,7 @@ import json
 import datetime
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-    QPushButton, QLabel, QStackedWidget, QScrollArea, 
+    QPushButton, QLabel, QStackedWidget, QScrollArea,QFrame, 
     QTextEdit, QComboBox, QToolBar, QMenu, QMessageBox,QFileDialog,QDialog
 )
 from PyQt6.QtGui import QAction, QPixmap
@@ -155,7 +155,7 @@ class LogWriter(QWidget):
         return None
     def select_image(self):
         '''选择照片'''
-        file_path = self.get_image_file_path()
+        file_path  = self.get_image_file_path()
         if file_path:
             self.selected_image = file_path
         # file_dialog = QFileDialog()
@@ -228,8 +228,13 @@ class MainWindow(QMainWindow):
         toolbar.addAction(back_action)
         
         # 日志查看按钮
-        view_logs_action = QAction(QIcon.fromTheme("view-list-details"), "查看日志", self)
-        view_logs_action.triggered.connect(self.show_log_view)
+        view_logs_action = QAction(QIcon.fromTheme("view-list-details"), "查看上一次日志", self)
+        view_logs_action.triggered.connect(self.show_recentlog_view)
+        toolbar.addAction(view_logs_action)
+
+        # 日志记录按钮
+        view_logs_action = QAction(QIcon.fromTheme("view-list-details"), "查看所有日志", self)
+        view_logs_action.triggered.connect(self.show_logs_view)
         toolbar.addAction(view_logs_action)
         
         # 保存所有日志按钮
@@ -306,10 +311,10 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.log_writer)
         self.stack.setCurrentWidget(self.log_writer)
     
-    def show_log_view(self):
+    def show_recentlog_view(self):
         """显示日志查看界面"""
         # 简化实现，实际应创建完整日志浏览界面
-        last_logs = self.log_manager.get_recent_logs(10)
+        # last_logs = self.log_manager.get_recent_logs(10)
         last_log = self.log_manager.last_added
         if last_log:
             dialog = QDialog(self)
@@ -346,11 +351,12 @@ class MainWindow(QMainWindow):
 
             dialog.exec()
         else:
-            QMessageBox.information(self, "日志记录", "还没有输入过日志。")
+            QMessageBox.information(self, "日志记录", "还没有输入日志。")
 
-        msg = "你写入的日志:\n"
-        for log in last_logs:
-            msg += f"\n{log.date.strftime('%m-%d %H:%M')} {log.plant_name}: {log.content[:]}"
+        # msg = "你写入的日志:\n"
+        # for log in last_logs:
+        #     msg += f"\n{log.date.strftime('%m-%d %H:%M')} {log.plant_name}: {log.content[:]}"
+            # dialog.exec()
             # if log:
             #     dialog = QDialog(self)
             #     dialog.setWindowTitle("日志记录")
@@ -385,15 +391,112 @@ class MainWindow(QMainWindow):
                         # layout.addWidget(image_label)
 
             # dialog.exec()
-        QMessageBox.information(self, "日志记录", msg)
+        # QMessageBox.information(self, "日志记录", msg)
+    # def show_logs_view(self):
+    #     """显示日志列表视图"""
+    #     last_logs = self.log_manager.get_recent_logs(10)
+    #     msg = "你写入的日志:\n"
+    #     for log in last_logs:
+    #         if log.image:
+    #             dialog  = QDialog(self)
+    #             layout = QVBoxLayout(dialog)
+    #             log_info = QLabel(f"{log.date.strftime('%m-%d %H:%M')} {log.plant_name}: {log.content}")
+    #             layout.addWidget(log_info)
+    #             pixmap = QPixmap(log.image)
+    #             if not pixmap.isNull():
+    #                  # 获取图片原始尺寸
+    #                 original_width = pixmap.width()
+    #                 original_height = pixmap.height()
+    #                 # 限制最大缩放尺寸
+    #                 max_width = 640
+    #                 max_height = 640
+    #                 # 计算缩放比例
+    #                 scale_width = max_width / original_width
+    #                 scale_height = max_height / original_height
+    #                 scale_factor = min(scale_width, scale_height, 1.0)  # 确保不超过原始尺寸
+    #                 new_width = int(original_width * scale_factor)
+    #                 new_height = int(original_height * scale_factor)
+    #                 # 使用高质量抗锯齿缩放算法
+    #                 pixmap = pixmap.scaled(new_width, new_height, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+    #                 image_label = QLabel()
+    #                 image_label.setPixmap(pixmap)
+    #                 layout.addWidget(image_label)
+    #                 # pixmap = pixmap.scaled(640, 640, Qt.AspectRatioMode.KeepAspectRatio)
+    #                 # image_label = QLabel()
+    #                 # image_label.setPixmap(pixmap)
+    #                 # layout.addWidget(image_label)
+    #                 dialog.exec()
+    #         msg += f"\n{log.date.strftime('%m-%d %H:%M')} {log.plant_name}: {log.content[:]}"
+    #     QMessageBox.information(self, "日志记录", msg)
+    def show_logs_view(self):
+    # """显示日志列表视图"""
+        last_logs = self.log_manager.get_recent_logs()
+    
+        # 创建主窗口和布局
+        dialog = QDialog(self)
+        dialog.setWindowTitle("日志记录")
+        dialog.resize(800, 600)
+    
+        # 创建可滚动区域
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+    
+        # 创建内容部件
+        content_widget = QWidget()
+        layout = QVBoxLayout(content_widget)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)  # 顶部对齐
+    
+        # 添加所有日志
+        if not last_logs:
+            layout.addWidget(QLabel("暂无日志记录"))
+        else:
+            for log in last_logs:
+                # 创建日志条目容器
+                log_frame = QFrame()
+                log_frame.setFrameShape(QFrame.Shape.Box)
+                log_layout = QVBoxLayout(log_frame)
+                
+                # 添加日志基本信息
+                log_info = QLabel(f"{log.date.strftime('%m-%d %H:%M')} {log.plant_name}: {log.content}")
+                log_layout.addWidget(log_info)
+                
+                # 添加图片（如果有）
+                if log.image:
+                    pixmap = QPixmap(log.image)
+                    if not pixmap.isNull():
+                        # 缩放图片（保持宽高比）
+                        scaled = pixmap.scaled(
+                            640, 
+                            480, 
+                            Qt.AspectRatioMode.KeepAspectRatio,
+                            Qt.TransformationMode.SmoothTransformation
+                        )
+                        image_label = QLabel()
+                        image_label.setPixmap(scaled)
+                        log_layout.addWidget(image_label)
+                
+                # 添加间距分隔符
+                log_layout.addSpacing(20)
+                layout.addWidget(log_frame)
+        
+        # 设置滚动区域内容
+        scroll_area.setWidget(content_widget)
+        
+        # 设置对话框主布局
+        main_layout = QVBoxLayout(dialog)
+        main_layout.addWidget(scroll_area)
+        
+        # 添加确定按钮
+        btn_ok = QPushButton("确定")
+        btn_ok.clicked.connect(dialog.accept)
+        main_layout.addWidget(btn_ok)
+        
+        dialog.exec()
     
     def show_plants_view(self):
         """显示植物列表视图"""
         self.stack.setCurrentWidget(self.plants_view)
         
-
-
-
 
 class FlowerSpring(QApplication):
     """养花日志应用"""
