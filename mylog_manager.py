@@ -11,7 +11,7 @@ from datetime import datetime
 
 class LogEntry:
     """日志条目类，用于表示单条日志信息"""
-    __slots__ = ('plant_name', 'content', 'weather', 'growth', 'date', 'image','next')
+    __slots__ = ('plant_name', 'content', 'weather', 'growth', 'date', 'image' )
     def __init__(self, plant_name, content, weather, growth,image,date=None):
         self.plant_name = plant_name
         self.content = content
@@ -19,7 +19,7 @@ class LogEntry:
         self.growth = growth
         self.date = date if date else datetime.now()
         self.image = image
-        self.next = None # 指向下一个日志条目的指针
+     
 
     def to_dict(self):
         return {
@@ -60,6 +60,7 @@ class LogLinkedList:
         log_node = LogNode(log_entry)
         log_node.next = self.head
         self.head = log_node
+        self.last_added = log_node
         self.size+=1#指针指向下一个链表,链表长度增加
     
     def add_log_tail(self,log_entry):
@@ -72,10 +73,10 @@ class LogLinkedList:
             while current.next:#使用临时变量完成对链表的遍历,遍历到最后一个节点接入新的节点
                 current = current.next
             current.next = log_node
+            # self.last_added = log_node
         self.size+=1#指针指向下一个链表,链表长度增加
     
     def get_all_logs(self):
-        """获取所有日志节点"""
         logs = []
         current = self.head
         while current:
@@ -83,79 +84,82 @@ class LogLinkedList:
             current = current.next
         return logs
 
-    def remove_log(self,log_entry):
+    def remove_log(self, log_entry):
         if not self.head:
             return False
         #如果删除的是头节点
-        if self.head.log_entry ==log_entry:
+        if self.head.log_entry == log_entry:
             self.head = self.head.next
-            self.size -=1
+            self.size -= 1
             if self.size == 0:
                 self.last_added = None
             return True
         #如果删除的是中间节点或者尾节点
-        else:
-            current = self.head
-            while current.next:
-                current = current.next
-                if current.next.log_entry == log_entry:
-                    #如果删除的是最后一个节点,更新last_added
-                    if current.next == self.last_added:
-                        self.last_added = current if current.next.next is None else current.next.next
-                    current.next = current.next.next
-                    self.size -=1
-                    return True
-                current = current.next
-            return False
-         
-        def get_logs_by_plants(self,plant):
-            '''获取特定植物的日志'''
-            logs = []
-            current = self.head
-            while current:
-                if current.log_entry.plant_name == plant:
-                    logs.append(current.log_entry)
-                current = current.next
-            return logs
-        
-        def get_logs_by_date(self,date):
-            '''获取特定日期的日志'''
-            logs = []
-            current = self.head
-            while current:
-                if current.log_entry.date == date:
-                    logs.append(current.log_entry)
-                current = current.next
-            return logs
-        
-        def get_recent_logs(self,num=10):
-            logs = []
-            current = self.head
-            for i in range(count):
-                logs.append(current.log_entry)
-                current = current.next
-            return logs
-        
-        def to_list(self):
-            '''转换为列表,便于存储'''
-            return [log.to_dict() for log in self.logs]
+        current = self.head
+        while current.next:
+            if current.next.log_entry == log_entry:
+                #如果删除的是最后一个节点,更新last_added
+                if current.next == self.last_added:
+                    self.last_added = current if current.next.next is None else current.next.next
+                current.next = current.next.next
+                self.size -= 1
+                return True
+            current = current.next
+        return False
 
-        def __str__(self):
-            '''可视化列表'''
-            result = []
-            current = self.head
-            while current:
-                log = current.log_entry
-                result.append(f"[{log.date}] {log.plant_name} - {log.content}")
-                current = current.next
-            return "\n".join(result)
-        
-        def print_list(self):
-            current = self.head
-            while current:
-                print(current.log_entry,end = "->")
-                current = current.next
-            print("None")
+    def get_logs_by_plants(self, plant):
+        '''获取特定植物的日志'''
+        logs = []
+        current = self.head
+        print(f"开始遍历链表，查找植物: {plant}")  # 调试打印
+        while current:
+            print(f"当前节点植物: {current.log_entry.plant_name}")  # 调试打印
+            if current.log_entry.plant_name == plant:
+                logs.append(current.log_entry)
+            current = current.next
+        print(f"找到的日志数量: {len(logs)}")  # 调试打印
+        return logs
+
+    def get_logs_by_date(self, date):
+        '''获取特定日期的日志'''
+        logs = []
+        current = self.head
+        while current:
+            if current.log_entry.date == date:
+                logs.append(current.log_entry)
+            current = current.next
+        return logs
+
+    def get_recent_logs(self, num=10):
+        logs = []
+        current = self.head
+        for i in range(num):
+            if current is None:
+                break
+            logs.append(current.log_entry)
+            current = current.next
+        return logs
+
+    def to_list(self):
+        '''转换为列表,便于存储'''
+        return [log.to_dict() for log in self.get_all_logs()]
+
+    def __str__(self):
+        '''可视化列表'''
+        result = []
+        current = self.head
+        while current:
+            log = current.log_entry
+            result.append(f"[{log.date}] {log.plant_name} - {log.content}")
+            current = current.next
+        return "\n".join(result)
+
+    def print_list(self):
+        current = self.head
+        while current:
+            print(current.log_entry, end="->")
+            current = current.next
+        print("None")
 
 class LogManager:
     """日志管理系统（使用链表、栈、队列）"""
@@ -164,11 +168,23 @@ class LogManager:
         self.undo_stack = []        # 栈用于日志删除撤销
         self.archive_queue = []      # 队列用于日志归档
     
-    def add_log(self, plant_name, content):
+    def add_log(self, plant_name, content,wearher=None,growth = None,image=None,date=None):
         """添加新日志"""
-        new_log = LogEntry(plant_name, content)
+        new_log = LogEntry(plant_name, content,wearher,growth,image,date)
         self.logs.add_log(new_log)
         return new_log
+
+    def get_logs_by_plants(self, plant):
+        """获取特定植物的日志"""
+        return self.logs.get_logs_by_plants(plant)
+    
+    def get_logs_by_date(self, date):
+        """获取特定日期的日志"""
+        return self.logs.get_logs_by_date(date)
+    
+    def get_recent_logs(self, num=10):
+        """获取最近的指定数量的日志"""
+        return self.logs.get_recent_logs(num)    
     
     def delete_log(self, log_entry):
         """删除日志"""
@@ -186,7 +202,7 @@ class LogManager:
         # 从栈中弹出最后删除的日志
         deleted_log = self.undo_stack.pop()
         # 添加回日志链表
-        self.logs.add_log_tail(deleted_log)
+        self.logs.add_log(deleted_log)
         return True
     
     def archive_old_logs(self, max_logs_per_plant=100):
@@ -195,7 +211,7 @@ class LogManager:
         plant_counts = {}
         
         while current:
-            plant = current.plant_name
+            plant = current.log_entry.plant_name
             plant_counts[plant] = plant_counts.get(plant, 0) + 1
             
             # 如果某个植物的日志过多，归档最早的
@@ -215,9 +231,9 @@ class LogManager:
         oldest = None
         current = self.logs.head
         while current:
-            if current.plant_name == plant_name:
+            if current.log_entry.plant_name == plant_name:
                 # 没有找到更旧的日志，直接更新
-                if oldest is None or current.date < oldest.date:
+                if oldest is None or current.log_entry.date < oldest.log_entry.date:
                     oldest = current
             current = current.next
         return oldest
@@ -277,9 +293,9 @@ class LogManager:
 #         self.last_added = log_entry
 #         return log_entry
 
-#     def get_recent_logs(self, num=10):
-#         """获取最近的指定数量的日志"""
-#         return self.logs[-num:]
+    # def get_recent_logs(self, num=10):
+    #     """获取最近的指定数量的日志"""
+    #     return self.logs[-num:]
 
 #     def load_from_file(self):
 #         """从文件加载日志"""

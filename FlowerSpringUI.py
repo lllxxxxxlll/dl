@@ -14,12 +14,13 @@ import datetime
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QLabel, QStackedWidget, QScrollArea,QFrame, 
-    QTextEdit, QComboBox, QToolBar, QMenu, QMessageBox,QFileDialog,QDialog
+    QTextEdit, QComboBox, QToolBar, QMenu, QMessageBox,QFileDialog,QDialog,QListWidget,QListWidgetItem
 )
 from PyQt6.QtGui import QAction, QPixmap
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QFont, QIcon, QCursor
 from mylog_manager import LogManager
+from testui import LogSearchUI
 
 
 
@@ -27,23 +28,29 @@ class LogWriter(QWidget):
     """日志写入界面"""
     def __init__(self, log_manager, plant_name, parent=None):
         super().__init__(parent)
+        print(f"创建LogWriter，植物名称: {plant_name}")  # 调试打印
+        print(f"父控件状态: {'有效' if parent else '无'}")  # 新增调试
         self.log_manager = log_manager
         self.plant_name = plant_name
+        self.log_list_widget = QListWidget()#提前初始化控件
+        print(f"log_list_widget对象ID(初始化): {id(self.log_list_widget)}")  # 新增对象ID检查
         self.selected_image = None
+        # self.log_list_widget = None  # 新增日志列表控件
         
         # 创建UI组件
         self.setup_ui()
-    
+        print(f"初始化完成，log_list_widget状态: {'存在' if hasattr(self, 'log_list_widget') else '不存在'}")  # 新增调试
+        print(f"log_list_widget对象ID(初始化后): {id(self.log_list_widget)}")  # 新增对象ID检查
+
     def setup_ui(self):
         # 主布局
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
         
         # 标题
         title = QLabel(f"记录「{self.plant_name}」的养护日志")
-        # title.setFont(QFont("Arial", 16, QFontWeight.Bold))
         title.setStyleSheet("color: #2e7d32;")
-        layout.addWidget(title)
+        main_layout.addWidget(title)
         
         # 内容编辑区
         self.editor = QTextEdit()
@@ -58,16 +65,53 @@ class LogWriter(QWidget):
                 min-height: 200px;
             }
         """)
-        layout.addWidget(self.editor, 1)  # 设置拉伸因子
+        main_layout.addWidget(self.editor, 1)  # 设置拉伸因子
         
         # 信息工具栏
-        self.setup_toolbar(layout)
+        self.setup_toolbar(main_layout)
         select_image_button = QPushButton("选择照片")
         select_image_button.clicked.connect(self.select_image)
-        layout.addWidget(select_image_button)
+        main_layout.addWidget(select_image_button)
+
+        # 新增：日志列表显示
+        # self.log_list_widget = QListWidget()
+        print(f"log_list_widget创建完成: {self.log_list_widget}")  # 新增调试
+        main_layout.addWidget(self.log_list_widget)
+        print(f"log_list_widget已添加到布局")  # 新增调试
+
+        print("初始化日志列表")
+        self.log_list_widget.setVisible(True)
+        self.log_list_widget.setEnabled(True)
+        self.update_log_list()  # 初始化日志列表
+        
+        # 新增：创建底部水平布局
+        bottom_layout = QHBoxLayout()
+
+        # 新增：添加伸缩项，将按钮推向两侧
+        bottom_layout.addStretch(1)
+
+        # 删除按钮
+        delete_button = QPushButton("删除日志")
+        delete_button.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                border-radius: 5px;
+                padding: 10px 20px;
+            }
+            QPushButton:hover {
+                background-color: #d32f2f;
+            }
+            QPushButton:pressed {
+                background-color: #b71c1c;
+            }
+        """)
+        delete_button.clicked.connect(self.delete_log)
+        # 新增：将删除按钮添加到底部布局，左对齐
+        bottom_layout.addWidget(delete_button, alignment=Qt.AlignmentFlag.AlignLeft)
+
         # 保存按钮
         save_button = QPushButton("保存日志")
-        # save_button.setFont(QFont("Arial", 12, QFont.Bold))
         save_button.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
@@ -83,8 +127,81 @@ class LogWriter(QWidget):
             }
         """)
         save_button.clicked.connect(self.save_log)
-        layout.addWidget(save_button, alignment=Qt.AlignmentFlag.AlignRight)
-    
+        # 新增：将保存按钮添加到底部布局，右对齐
+        bottom_layout.addWidget(save_button, alignment=Qt.AlignmentFlag.AlignRight)
+
+        # 将底部布局添加到主布局
+        main_layout.addLayout(bottom_layout)
+        # 撤销删除按钮
+        undo_delete_button = QPushButton("撤销删除")
+        undo_delete_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border-radius: 5px;
+                padding: 10px 20px;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+            QPushButton:pressed {
+                background-color: #1565C0;
+            }
+        """)
+        undo_delete_button.clicked.connect(self.undo_delete_log)
+        bottom_layout.addWidget(undo_delete_button, alignment=Qt.AlignmentFlag.AlignLeft)
+
+    def update_log_list(self):
+        """更新日志列表显示"""
+        print(f"开始更新日志列表，控件状态: {'存在' if self.log_list_widget is not None else '不存在'}")  # 修改判断条件
+        print(f"update_log_list中的log_list_widget对象ID: {id(self.log_list_widget) if hasattr(self, 'log_list_widget') else '无'}")
+        
+        if self.log_list_widget is not None:  # 修改为显式的None检查
+            print(f"控件实际状态: 可见={self.log_list_widget.isVisible()}, 启用={self.log_list_widget.isEnabled()}")
+            self.log_list_widget.clear()
+            print(f"正在获取植物 [{self.plant_name}] 的日志...")
+            plant_logs = self.log_manager.get_logs_by_plants(self.plant_name)
+            print(f"获取到的日志数量: {len(plant_logs)}")
+            if not plant_logs:
+                print("警告: 未找到该植物的任何日志")
+            for i, log in enumerate(plant_logs):
+                log_text = f"{log.date.strftime('%m-%d %H:%M')} {log.content}"
+                print(f"添加日志 #{i+1}: {log_text}")
+                self.log_list_widget.addItem(log_text)
+        else:
+            print("错误: log_list_widget为None")
+
+    def delete_log(self):
+        """删除日志"""
+         #获取当前植物的日志
+        plant_logs =  self.log_manager.get_logs_by_plants(self.plant_name)
+        # 确认删除
+        confirm = QMessageBox.question(self, "确认删除", "确定要删除当前选中的日志吗？", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if confirm == QMessageBox.StandardButton.No:
+            return
+        
+        # 获取用户选中的日志索引
+        selected_items = self.log_list_widget.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self, "警告", "请选择要删除的日志！")
+            return
+        
+        selected_index = self.log_list_widget.row(selected_items[0])
+        # # 获取当前植物的日志
+        plant_logs =  self.log_manager.get_logs_by_plants(self.plant_name)
+
+        if 0 <= selected_index < len(plant_logs):
+            log_entry_to_delete = plant_logs[selected_index]
+            if self.log_manager.delete_log(log_entry_to_delete):
+                self.log_manager.save_to_file()
+                self.update_log_list()  # 更新日志列表显示
+                QMessageBox.information(self, "成功", "日志已删除！")
+                self.editor.clear()
+                self.selected_image = None  # 删除后清空选中的图片路径
+            else:
+                QMessageBox.warning(self, "警告", "删除日志失败！")
+        else:
+            QMessageBox.warning(self, "警告", "没有可删除的日志！")
     def setup_toolbar(self, main_layout):
         """设置信息工具栏"""
         toolbar = QHBoxLayout()
@@ -191,6 +308,20 @@ class LogWriter(QWidget):
         QMessageBox.information(self, "成功", "日志已保存！")
         self.editor.clear()
         self.selected_image = None  # 保存后清空选中的图片路径
+    
+    def undo_delete_log(self):
+        """撤销删除日志"""
+        # 确认撤销删除
+        confirm = QMessageBox.question(self, "确认撤销删除", "确定要撤销删除当前日志吗？", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if confirm == QMessageBox.StandardButton.No:
+            return
+        # 撤销删除当前日志
+        if self.log_manager.undo_delete():
+            self.log_manager.save_to_file()
+            QMessageBox.information(self, "成功", "日志已撤销删除！")
+        else:
+            QMessageBox.warning(self, "警告", "没有可撤销删除的日志！")
+    
 
 #设置页面内容
 class MainWindow(QMainWindow):
@@ -199,7 +330,8 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.log_manager = LogManager()
         self.log_manager.load_from_file()  # 从文件加载现有日志
-        
+        # self.search_ui = LogSearchUI() #直接初始化会导致日志搜索界面显示异常
+        self.search_ui = None
         self.setWindowTitle("养花日志系统")
         self.setGeometry(100, 100, 800, 600)
         
@@ -241,6 +373,52 @@ class MainWindow(QMainWindow):
         save_action = QAction(QIcon.fromTheme("document-save"), "保存所有", self)
         save_action.triggered.connect(lambda: self.log_manager.save_to_file())
         toolbar.addAction(save_action)
+        # 搜索日志按钮
+        search_action = QAction(QIcon.fromTheme("system-search"), "搜索日志", self)
+        search_action.triggered.connect(self.show_search_ui)
+        toolbar.addAction(search_action)
+
+        # 归档旧日志按钮
+        archive_action = QAction(QIcon.fromTheme("archive"), "归档旧日志", self)
+        archive_action.triggered.connect(self.archive_old_logs)
+        toolbar.addAction(archive_action)
+        # # 导出日志按钮
+        # export_action = QAction(QIcon.fromTheme("document-export"), "导出日志", self)
+        # export_action.triggered.connect(self.export_logs)
+        # toolbar.addAction(export_action)
+    def show_search_ui(self):
+        """显示日志搜索界面"""
+        if not self.search_ui:
+            self.search_ui = LogSearchUI()
+        self.search_ui.show()
+    def archive_old_logs(self):
+        """归档旧日志"""
+        # 确认归档
+        confirm = QMessageBox.question(self, "确认归档", "确定要归档旧日志吗？", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if confirm == QMessageBox.StandardButton.No:
+            return
+        # 调用 LogManager 类的方法归档旧日志
+        self.log_manager.archive_old_logs()
+        # 刷新显示
+        self.refresh_logs_display()
+        QMessageBox.information(self, "成功", "旧日志已归档！")
+    # def export_logs(self):
+    #     """导出日志"""
+    #     # 确认导出
+    #     confirm = QMessageBox.question(self, "确认导出", "确定要导出所有日志吗？", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+    #     if confirm == QMessageBox.StandardButton.No:
+    #         return
+    #     # 调用 LogManager 类的方法导出日志
+    #     self.log_manager.export_logs()
+    #     QMessageBox.information(self, "成功", "日志已导出！")
+    # def refresh_logs_display(self):
+    #     """刷新日志显示"""
+    #     # 清空当前显示
+    #     self.log_list.clear()
+    #     # 重新加载日志
+    #     self.log_manager.load_from_file()
+    #     # 刷新显示
+    #     self.display_logs()
     
     def create_plants_view(self):
         """创建植物选择视图"""
@@ -315,17 +493,18 @@ class MainWindow(QMainWindow):
         """显示日志查看界面"""
         # 简化实现，实际应创建完整日志浏览界面
         # last_logs = self.log_manager.get_recent_logs(10)
-        last_log = self.log_manager.last_added
+        last_log = self.log_manager.get_recent_logs()
         if last_log:
+            recent_log = last_log[0]
             dialog = QDialog(self)
             dialog.setWindowTitle("日志记录")
             layout = QVBoxLayout(dialog)
 
-            log_info = QLabel(f"{last_log.date.strftime('%m-%d %H:%M')} {last_log.plant_name}: {last_log.content}")
+            log_info = QLabel(f"{recent_log.date.strftime('%m-%d %H:%M')} {recent_log.plant_name}: {recent_log.content}")
             layout.addWidget(log_info)
 
-            if last_log.image:
-                pixmap = QPixmap(last_log.image)
+            if recent_log.image:
+                pixmap = QPixmap(recent_log.image)
                 if not pixmap.isNull():
                      # 获取图片原始尺寸
                     original_width = pixmap.width()
